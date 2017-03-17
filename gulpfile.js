@@ -28,6 +28,8 @@ const useref = require('gulp-useref');
 const filter = require('gulp-filter');
 const del = require('del');
 const eslint = require('gulp-eslint');
+const webpackStream = require('webpack-stream');
+const webpack2 = require('webpack');
 
 gulp.task('default', () => {
   console.log('Default Task!');
@@ -45,30 +47,32 @@ gulp.task('clean', () => {
   return del('dist');
 });
 
-gulp.task('rollup', () => {
-  const rollup = require('rollup');
-  const babel = require('rollup-plugin-babel');
-  const uglify = require('rollup-plugin-uglify');
-  const nodeResolve = require('rollup-plugin-node-resolve');
-  const commonsjs = require('rollup-plugin-commonjs');
-  rollup.rollup({
-    entry: './src/js/app.js',
-    format: 'iife',
-    plugins: [
-      nodeResolve(),
-      commonsjs(),
-      babel(),
-      uglify()
-    ]
-  })
-  .then(bundle => {
-    bundle.write({
-      sourceMap: true,
-      // useStrict: false,
-      format: 'iife',
-      dest: 'dist/js/app.js'
-    });
-  });
+gulp.task('webpack', () => {
+  return gulp.src('./src/js/app.js')
+    .pipe(webpackStream({
+      devtool: 'source-map',
+      output: {
+        filename: 'app.js'
+      },
+      module: {
+        rules: [
+          {
+            test: /\.js$/,
+            exclude: /node_modules/,
+            use: {
+              loader: 'babel-loader',
+              options: {
+                presets: ['es2015']
+              }
+            }
+          }
+        ]
+      },
+      plugins: [
+        new webpack2.optimize.UglifyJsPlugin({minimize: true, sourceMap: true})
+      ]
+    }, webpack2))
+    .pipe(gulp.dest('dist/js'));
 });
 
 gulp.task('minify', () => {
@@ -128,7 +132,7 @@ gulp.task('dist', () => {
   runSequence(
     'eslint',
     'clean',
-    ['rollup', 'static', 'minify'],
+    ['webpack', 'static', 'minify'],
      'rev',
      'generate-service-worker');
 });
